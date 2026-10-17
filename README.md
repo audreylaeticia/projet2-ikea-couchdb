@@ -8,7 +8,9 @@
 ### 2. Cloner le dépôt et installer les dépendances
 
 git clone https://github.com/audreylaeticia/projet2-ikea-couchdb.git
+
 cd projet2-ikea-couchdb
+
 pip install requests beautifulsoup4
 
 
