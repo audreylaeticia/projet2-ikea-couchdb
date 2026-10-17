@@ -6,8 +6,10 @@ import requests
 from bs4 import BeautifulSoup
 
 # Lire les liens enregistrés à l'étape précédente.
-with open("liens_plusieurs_categories.csv", encoding="utf-8") as fichier:
+with open("liens_nouveaux.csv", encoding="utf-8") as fichier:
     liens = list(csv.DictReader(fichier))
+# Extraire seulement les 2 200 premiers liens.
+liens = liens[:2200]
 
 colonnes = [
     "identifiant", "nom", "description", "categorie",
@@ -16,7 +18,7 @@ colonnes = [
 
 # Le mode "x" évite d'écraser un CSV brut existant.
 with open(
-    "produits_bruts_681.csv", "x", newline="", encoding="utf-8"
+    "produits_bruts_nouveaux.csv", "x", newline="", encoding="utf-8"
 ) as fichier:
     writer = csv.DictWriter(fichier, fieldnames=colonnes)
     writer.writeheader()

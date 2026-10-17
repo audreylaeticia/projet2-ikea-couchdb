@@ -29,7 +29,7 @@ for lien in soup.find_all("a", href=True):
 print("Catégories trouvées :", len(categories))
 
 # Premier essai : visiter au maximum 20 catégories.
-categories = categories[:20]
+categories = categories[20:]
 
 # 2. Visiter chaque catégorie.
 for categorie in categories:
@@ -64,7 +64,7 @@ for categorie in categories:
 
 # 4. Enregistrer dans un nouveau fichier.
 with open(
-    "liens_plusieurs_categories.csv",
+    "liens_categories_restantes.csv",
     "x",
     newline="",
     encoding="utf-8"
