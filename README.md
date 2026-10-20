@@ -11,7 +11,7 @@ Le fichier `donnees.json` contient 2 880 produits. Il permet de recréer la base
 - Python 3 installé.
 - Git installé pour cloner le dépôt.
 - Apache CouchDB installé et démarré.
-- Un compte CouchDB autorisé à créer une base et à importer des documents.
+- Un compte CouchDB autorisé à créer une base, importer des documents et créer des index et des vues.
 
 Fauxton est accessible à cette adresse :
 
@@ -29,6 +29,8 @@ Si le dépôt est déjà présent, ouvrir son dossier dans le terminal et récup
 ```powershell
 git pull
 ```
+
+Si le projet provient du ZIP de remise, extraire le ZIP et ouvrir un terminal dans le dossier contenant les scripts et `donnees.json`.
 
 ## 3. Installer les dépendances
 
@@ -48,6 +50,8 @@ python -m pip install requests beautifulsoup4
 6. Valider la création.
 
 Le script d’importation utilise une base existante : il ne la crée pas automatiquement.
+
+Si la base contient déjà les produits, passer directement aux vérifications et aux requêtes.
 
 ## 5. Importer les données JSON
 
@@ -76,6 +80,8 @@ Erreurs : 0
 
 Ne pas relancer l’importation sur les mêmes documents : des erreurs de conflit peuvent apparaître lorsque leurs identifiants existent déjà.
 
+Aucun mot de passe ou jeton d’accès ne doit être enregistré dans les fichiers du projet.
+
 ## 6. Vérifier l’importation
 
 Dans Fauxton :
@@ -84,7 +90,7 @@ Dans Fauxton :
 2. Vérifier la présence des produits.
 3. Ouvrir un document dont l’identifiant commence par `ikea_`.
 4. Vérifier que les accents sont conservés.
-5. Vérifier que les prix sont numériques, sans guillemets.
+5. Vérifier que les prix connus sont numériques, sans guillemets.
 6. Vérifier que les informations inconnues sont représentées par `null`.
 
 Le nombre total de documents peut dépasser 2 880 après la création des documents techniques des index et des vues.
@@ -102,32 +108,69 @@ Résultat attendu :
 2880
 ```
 
-## 7. Créer les index Mango
+Pour afficher deux exemples :
 
-Dans Fauxton, ouvrir la base et accéder à la création d’un index Mango, généralement depuis **Run a Query with Mango**, puis **Manage Indexes** ou **Index Manager**.
+```powershell
+$produits | Select-Object -First 2 | ConvertTo-Json -Depth 5
+```
 
-Créer séparément les deux index suivants.
+## 7. Fichiers des requêtes
+
+Le dossier `requetes` contient :
+
+| Fichier | Rôle |
+|---|---|
+| `requete1.json` | Filtre multicritère avec projection |
+| `requete2.json` | Tri croissant avec limite |
+| `index_categorie_prix.json` | Définition de l’index sur la catégorie et le prix |
+| `index_prix.json` | Définition de l’index sur le prix |
+| `vue_par_categorie.json` | Définition du document de conception et de la vue MapReduce |
+
+Les étapes suivantes expliquent comment créer ces index et cette vue, puis exécuter les requêtes.
+
+## 8. Créer les index Mango
+
+Dans Fauxton, ouvrir `ikea_produits`, puis accéder à la création d’un index Mango depuis **Run a Query with Mango**, puis **Manage Indexes** ou **Index Manager**, selon la version.
+
+Créer séparément les deux index ci-dessous. S’ils existent déjà avec les mêmes champs, il n’est pas nécessaire de les recréer.
+
+Les noms correspondent aux noms automatiques des index utilisés dans le projet.
 
 ### Index sur la catégorie et le prix
+
+Contenu de `requetes/index_categorie_prix.json` :
 
 ```json
 {
   "index": {
-    "fields": ["categorie", "prix"]
+    "fields": [
+      {
+        "categorie": "asc"
+      },
+      {
+        "prix": "asc"
+      }
+    ]
   },
-  "name": "idx_categorie_prix",
+  "name": "2ef3c4fb464663802372bb7ce3a2f8ba1d66d446",
   "type": "json"
 }
 ```
 
 ### Index sur le prix
 
+Contenu de `requetes/index_prix.json` :
+
 ```json
 {
   "index": {
-    "fields": ["prix"]
+    "fields": [
+      {
+        "prix": "asc"
+      }
+    ]
   },
-  "name": "idx_prix",
+  "name": "d7121ec3cfeef227b4c4ae614343a75645b9712f",
   "type": "json"
 }
 ```
@@ -138,11 +181,15 @@ Ces définitions correspondent aux corps des requêtes de création d’index :
 POST /ikea_produits/_index
 ```
 
-## 8. Exécuter les requêtes Mango
+## 9. Exécuter les requêtes Mango
 
-Dans Fauxton, ouvrir `ikea_produits`, puis **Run a Query with Mango**. Coller chaque requête séparément et cliquer sur **Run Query**.
+Dans Fauxton, ouvrir `ikea_produits`, puis **Run a Query with Mango**.
+
+Coller chaque requête séparément et cliquer sur **Run Query**.
 
 ### Requête 1 — Filtre multicritère avec projection
+
+Contenu de `requetes/requete1.json` :
 
 ```json
 {
@@ -160,7 +207,11 @@ Dans Fauxton, ouvrir `ikea_produits`, puis **Run a Query with Mango**. Coller ch
 
 Cette requête retourne au maximum dix produits de la catégorie demandée dont le prix numérique est inférieur à 20 $.
 
-### Requête 2 — Tri avec limite
+La projection conserve uniquement l’identifiant, le nom, le prix et la catégorie.
+
+### Requête 2 — Tri ascendant avec limite
+
+Contenu de `requetes/requete2.json` :
 
 ```json
 {
@@ -193,16 +244,20 @@ Les prix observés lors de la vérification étaient :
 
 L’ordre entre les produits de même prix n’est pas fixé par un critère secondaire.
 
-## 9. Créer la vue MapReduce
+## 10. Créer et interroger la vue MapReduce
 
-Dans Fauxton, ouvrir la base `ikea_produits`, puis utiliser l’option de création d’une vue.
+### Création dans Fauxton
+
+Dans Fauxton, ouvrir `ikea_produits`, puis utiliser l’option de création d’une vue dans **Design Documents**.
 
 Configurer :
 
-- **Document de conception :** `_design/analyses`
+- **Document de conception :** `_design/newDesign`
 - **Nom de la vue :** `par_categorie`
 
-Si l’interface ajoute automatiquement `_design/`, saisir uniquement `analyses`.
+Si l’interface ajoute automatiquement `_design/`, saisir uniquement `newDesign`.
+
+Si la vue existe déjà, consulter sa définition au lieu de créer une deuxième vue.
 
 ### Fonction Map
 
@@ -225,7 +280,31 @@ _stats
 
 Enregistrer la vue.
 
-### Consulter les résultats
+### Définition JSON complète
+
+Contenu de `requetes/vue_par_categorie.json` :
+
+```json
+{
+  "_id": "_design/newDesign",
+  "views": {
+    "par_categorie": {
+      "map": "function (doc) { if (typeof doc.categorie === \"string\" && typeof doc.prix === \"number\") { emit(doc.categorie, doc.prix); } }",
+      "reduce": "_stats"
+    }
+  }
+}
+```
+
+Cette définition peut également être utilisée pour créer un nouveau document de conception avec :
+
+```text
+PUT /ikea_produits/_design/newDesign
+```
+
+Si le document existe déjà, sa modification nécessite sa révision actuelle `_rev`. L’édition de la vue dans Fauxton permet de gérer cette modification.
+
+### Requête 3 — Regroupement avec calcul
 
 Dans les options de la vue :
 
@@ -236,7 +315,7 @@ Dans les options de la vue :
 La requête HTTP équivalente est :
 
 ```text
-GET /ikea_produits/_design/analyses/_view/par_categorie?group=true
+GET /ikea_produits/_design/newDesign/_view/par_categorie?group=true
 ```
 
 Chaque catégorie contient les statistiques suivantes :
@@ -249,22 +328,36 @@ Chaque catégorie contient les statistiques suivantes :
 
 Les produits sans prix numérique sont exclus.
 
-Pour la catégorie « Abat-jour décoratifs pour lampes », les résultats observés étaient :
+### Extrait des résultats vérifiés
 
 ```json
-{
-  "key": "Abat-jour décoratifs pour lampes",
-  "value": {
-    "sum": 157.84,
-    "count": 16,
-    "min": 6.99,
-    "max": 14.99,
-    "sumsqr": 1668.8416000000002
+[
+  {
+    "key": "Abat-jour décoratifs pour lampes",
+    "value": {
+      "sum": 157.84,
+      "count": 16,
+      "min": 6.99,
+      "max": 14.99,
+      "sumsqr": 1668.8416000000002
+    }
+  },
+  {
+    "key": "Accessoires de conservation des aliments et sacs refermables",
+    "value": {
+      "sum": 2.99,
+      "count": 1,
+      "min": 2.99,
+      "max": 2.99,
+      "sumsqr": 8.940100000000001
+    }
   }
-}
+]
 ```
 
-## 10. Refaire la transformation depuis les CSV
+De légères différences dans les dernières décimales peuvent apparaître dans les calculs en virgule flottante.
+
+## 11. Refaire la transformation depuis les CSV
 
 Cette étape est facultative pour recréer la base, puisque `donnees.json` est fourni.
 
@@ -281,23 +374,58 @@ Le script lit :
 
 Il réécrit `donnees.json`, sans modifier les CSV bruts.
 
-## 11. Code d’extraction
+Le bilan observé lors du nettoyage était :
 
-Le script `extraire_produits.py` utilise `requests` et `BeautifulSoup` pour analyser les blocs JSON-LD de type `Product` présents dans les pages HTML IKEA.
+```text
+Lignes avant nettoyage : 2880
+Doublons retirés : 0
+Lignes sans identifiant retirées : 0
+Valeurs numériques invalides remplacées par null : 0
+Produits après nettoyage : 2880
+Fichier créé : donnees.json
+```
 
-Dans sa version actuelle, il lit `liens_nouveaux.csv`, traite au maximum 2 200 liens et écrit dans `produits_bruts_nouveaux.csv`.
+Les valeurs absentes deviennent `null`, mais ne sont pas comptées parmi les valeurs numériques invalides.
 
-Il attend trois secondes entre les requêtes et s’arrête en cas de réponse HTTP 401, 403 ou 429.
+## 12. Code d’extraction
 
-L’extraction n’est pas nécessaire pour reproduire les résultats à partir du JSON fourni. Le script refuse d’écraser son CSV de sortie s’il existe déjà.
+Le script `extraire_produits.py` utilise `requests` et `BeautifulSoup` pour analyser les blocs JSON-LD de type `Product` intégrés aux pages HTML IKEA.
 
-## 12. Équipe
+Dans sa version actuelle, il :
+
+- lit les URL dans `liens_nouveaux.csv`;
+- traite au maximum 2 200 liens;
+- écrit les valeurs extraites dans `produits_bruts_nouveaux.csv`;
+- attend trois secondes entre les requêtes;
+- s’arrête en cas de réponse HTTP 401, 403 ou 429.
+
+L’extraction n’est pas nécessaire pour reproduire les résultats à partir du JSON fourni.
+
+Le script utilise le mode de création `x` : il refuse d’écraser son CSV de sortie si celui-ci existe déjà.
+
+## 13. Principaux fichiers du projet
+
+| Fichier ou dossier | Description |
+|---|---|
+| `rapport.md` | Rapport du projet |
+| `README.md` | Procédure de reproduction |
+| `extraire_produits.py` | Extraction des informations sur les produits |
+| `nettoyer_donnees.py` | Nettoyage des CSV et transformation en JSON |
+| `importer_couchdb.py` | Importation du JSON dans CouchDB |
+| `produits_bruts_681.csv` | Premier fichier brut utilisé par le nettoyage |
+| `produits_bruts_nouveaux.csv` | Deuxième fichier brut utilisé par le nettoyage |
+| `donnees.json` | Tableau des 2 880 produits nettoyés |
+| `requetes/` | Requêtes Mango, index et définition de la vue |
+
+Les autres scripts et CSV de liens du dépôt documentent les étapes de collecte et les essais d’extraction.
+
+## 14. Équipe
 
 - Audrey Laeticia Djoum Kom
 - Anne Joelle Allou
 
-## 13. Utilisation de l’IA
+## 15. Utilisation de l’intelligence artificielle
 
 ChatGPT a été utilisé pour aider à réviser la documentation, examiner les scripts et repérer des incohérences dans les résultats.
 
-Les vérifications et les résultats sont décrits dans `rapport.md`.
+Les vérifications effectuées et les résultats obtenus sont décrits dans `rapport.md`.
