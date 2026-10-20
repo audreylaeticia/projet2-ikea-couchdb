@@ -72,7 +72,8 @@ Dans Fauxton -> `ikea_produits` -> **Mango Query** :
 2. Nommez le document design newDesign (`_design/analyses`) et l'index `par_categorie`.
 3. **Map function :**
 function (doc) {
-  if (doc.categorie && doc.prix) {
+  if (typeof doc.categorie === "string" &&
+      typeof doc.prix === "number") {
     emit(doc.categorie, doc.prix);
   }
 }
