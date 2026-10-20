@@ -3,7 +3,7 @@
 ### 1. Prérequis
 
 * Python 3.x installé.
-* Apache CouchDB fonctionnel en local (`http://127.0.0.1:5984/`).
+* Apache CouchDB fonctionnel en local (`httphttp://127.0.0.1:5984/_utils/`).
 
 ### 2. Cloner le dépôt et installer les dépendances
 
